@@ -227,28 +227,41 @@ function moodLabel(score) {
 }
 
 async function callClaude(systemPrompt, messages, maxTokens) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": state.apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: maxTokens || 500,
-      system: systemPrompt,
-      messages: messages,
-    }),
-  });
-  if (!res.ok) {
-    let bodyText = "";
-    try { bodyText = await res.text(); } catch (e) { bodyText = "(본문 읽기 실패)"; }
-    throw new Error(`HTTP ${res.status}: ${bodyText.slice(0, 200)}`);
+  const attempt = async () => {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": state.apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: maxTokens || 500,
+        system: systemPrompt,
+        messages: messages,
+      }),
+    });
+    if (!res.ok) {
+      let bodyText = "";
+      try { bodyText = await res.text(); } catch (e) { bodyText = "(본문 읽기 실패)"; }
+      throw new Error(`HTTP ${res.status}: ${bodyText.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    return (data.content || []).map((b) => b.text || "").join("");
+  };
+
+  try {
+    return await attempt();
+  } catch (e) {
+    // 네트워크성 오류(TypeError 등)일 때만 한 번 더 시도
+    if (e instanceof TypeError) {
+      await new Promise((r) => setTimeout(r, 800));
+      return await attempt();
+    }
+    throw e;
   }
-  const data = await res.json();
-  return (data.content || []).map((b) => b.text || "").join("");
 }
 
 async function sendMessage(text) {
@@ -263,7 +276,7 @@ async function sendMessage(text) {
     const naggy = /(하지마|해야지|또|안돼|챙겨|운동|청소|아껴|왜 안|정신차려|야식)/.test(reply);
     state.naggingScore = Math.min(100, state.naggingScore + (naggy ? 12 : 3));
   } catch (e) {
-    state.messages.push({ role: "assistant", content: `어... 지금 연결이 좀 이상한데? (디버그: ${e.message})` });
+    state.messages.push({ role: "assistant", content: `어... 지금 연결이 좀 이상한데? (디버그: ${describeError(e)})` });
   } finally {
     state.sending = false;
     persistChat();
@@ -285,7 +298,7 @@ async function getComment() {
     state.comment = reply;
     state.naggingScore = Math.min(100, state.naggingScore + 15);
   } catch (e) {
-    state.comment = `코멘트를 못 가져왔어. (디버그: ${e.message})`;
+    state.comment = `코멘트를 못 가져왔어. (디버그: ${describeError(e)})`;
   } finally {
     state.commentLoading = false;
     persistChat();
@@ -324,7 +337,7 @@ async function submitDiaryEntry(text, mood) {
     );
     entry.feedback = reply;
   } catch (e) {
-    entry.feedback = `반응을 못 가져왔어. (디버그: ${e.message})`;
+    entry.feedback = `반응을 못 가져왔어. (디버그: ${describeError(e)})`;
   } finally {
     state.diaryLoading = false;
     persistDiary();
@@ -367,12 +380,19 @@ async function getChoreNagging() {
     state.choreNagComment = reply;
     state.naggingScore = Math.min(100, state.naggingScore + (undone.length === 0 ? 5 : 15));
   } catch (e) {
-    state.choreNagComment = `반응을 못 가져왔어. (디버그: ${e.message})`;
+    state.choreNagComment = `반응을 못 가져왔어. (디버그: ${describeError(e)})`;
   } finally {
     state.choreNagLoading = false;
     persistChat();
     render();
   }
+}
+
+function describeError(e) {
+  if (!e) return "(알 수 없는 오류)";
+  const name = e.name || "Error";
+  const msg = e.message || "(메시지 없음)";
+  return `${name}: ${msg}`;
 }
 
 function cleanApiKey(key) {
