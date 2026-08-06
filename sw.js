@@ -1,5 +1,5 @@
-const CACHE_NAME = "jansori-mate-v1";
-const ASSETS = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
+const CACHE_NAME = "jansori-mate-v2";
+const ASSETS = ["./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -18,9 +18,21 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // API 호출은 항상 네트워크로, 나머지 정적 파일은 캐시 우선
-  if (event.request.url.includes("api.anthropic.com")) return;
+  const url = event.request.url;
+  // API 호출은 캐시하지 않고 항상 네트워크로
+  if (url.includes("api.anthropic.com")) return;
+
+  // HTML(문서)은 항상 네트워크에서 최신 버전을 먼저 시도 - 실패 시에만 캐시 사용
+  if (event.request.mode === "navigate" || url.endsWith("/") || url.endsWith("index.html")) {
+    event.respondWith(
+      fetch(event.request, { cache: "no-store" }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // 그 외 정적 파일(아이콘 등)은 캐시 우선
   event.respondWith(
     caches.match(event.request).then((cached) => cached || fetch(event.request))
   );
 });
+
