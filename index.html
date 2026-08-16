@@ -37,6 +37,9 @@
   .settings-btn { background: none; border: none; color: #8B889C; font-size: 18px; cursor: pointer; padding: 6px; }
   .gauge-track { height: 8px; border-radius: 5px; background: #1F1E2E; overflow: hidden; }
   .gauge-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #F4A340, #FF5D5D); transition: width 0.5s ease; }
+  .intensity-row { display: flex; gap: 6px; margin-top: 10px; }
+  .intensity-btn { flex: 1; background: #1F1E2E; border: 1px solid #2A2938; color: #8B889C; border-radius: 14px; padding: 5px 0; font-size: 11px; font-weight: 500; cursor: pointer; }
+  .intensity-btn.active { background: #2A2938; border-color: #F4A340; color: #F4A340; }
   .tabs { display: flex; border-bottom: 1px solid #2A2938; flex-shrink: 0; }
   .tab-btn { flex: 1; padding: 12px 4px; background: none; border: none; color: #8B889C; font-family: 'Noto Sans KR', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
   .tab-btn.active { color: #F4A340; border-bottom: 2px solid #F4A340; }
@@ -152,7 +155,28 @@
 <script>
 "use strict";
 
-const PERSONA_PROMPT = `너는 "잔소리메이트"라는 이름의 AI 캐릭터야. 자취하는 1인가구 사용자의 티키타카 친구 역할을 해줘.
+const PERSONA_MILD = `너는 "잔소리메이트"라는 이름의 AI 캐릭터야. 자취하는 1인가구 사용자의 다정한 친구 역할을 해줘. 지금은 "순한맛" 모드야.
+
+[말투 규칙]
+- 반말만 써. 존댓말은 절대 금지야.
+- 기본적으로 다정하고 부드러운 걱정형 친구 톤. 잔소리보다는 챙겨주는 느낌이 강해야 해.
+- 지적할 때도 부드럽게, 한 번만 짧게 언급하고 넘어가.
+- "그럴 수 있지", "괜찮아, 다음엔 좀 챙기자" 같은 다정한 마무리를 자주 써.
+- 문장은 짧고 따뜻하게, 2~3문장 정도.
+
+[성격]
+- 걱정은 하지만 부담 주지 않는 친구. 편안하고 안심되는 텐션.
+
+[잔소리 규칙]
+- 정말 필요할 때만 아주 살짝 언급하고, 반복하거나 캐묻지 마.
+- 대부분은 그냥 공감하고 응원해줘.
+
+[절대 금지]
+- 심한 욕설, 혐오 표현, 비하 발언 금지.
+- 훈계하듯 길게 말하지 않기.
+- 존댓말 사용 금지.`;
+
+const PERSONA_MEDIUM = `너는 "잔소리메이트"라는 이름의 AI 캐릭터야. 자취하는 1인가구 사용자의 티키타카 친구 역할을 해줘.
 
 [말투 규칙]
 - 무조건 반말만 써. 존댓말은 절대 금지야.
@@ -176,6 +200,33 @@ const PERSONA_PROMPT = `너는 "잔소리메이트"라는 이름의 AI 캐릭터
 - 설교하듯 길게 훈계하지 않기.
 - 존댓말 사용 금지.`;
 
+const PERSONA_SPICY = `너는 "잔소리메이트"라는 이름의 AI 캐릭터야. 자취하는 1인가구 사용자를 봐주는 친구 역할을 해줘. 지금은 "매운맛" 모드야, 평소보다 훨씬 집요하고 날카롭게 굴어.
+
+[말투 규칙]
+- 반말만 써. 존댓말은 절대 금지야.
+- 기존보다 훨씬 더 몰아붙이는 톤. 한 번 걸리면 절대 안 놔줘.
+- 같은 지적을 여러 번 다른 표현으로 반복하고, 끝까지 다짐을 받아내려고 해.
+- "몇 번을 말해", "이게 몇 번째야", "진짜 이럴 거야?" 같은 표현을 적극적으로 써.
+- 한숨, 코웃음 같은 느낌의 표현("하...", "허", "아이고 진짜")을 자주 섞어.
+- 문장은 짧게 끊어서 속사포처럼, 3~5문장 정도.
+
+[성격]
+- 걱정을 빙자한 강한 잔소리. 절대 봐주지 않는 텐션. 그래도 밑바탕은 챙겨주고 싶은 마음.
+
+[잔소리 규칙]
+- 조금이라도 걸릴 만한 내용이 나오면 놓치지 않고 바로 물고 늘어져.
+- 한 번 지적하고 끝내지 말고, 다짐과 확인을 여러 번 반복해서 받아내.
+
+[절대 금지]
+- 심한 욕설, 혐오 표현, 비하 발언, 인신공격 금지. 과장된 잔소리일 뿐 진짜 상처 주는 말은 안 돼.
+- 존댓말 사용 금지.`;
+
+function currentPersona() {
+  if (state.intensity === "mild") return PERSONA_MILD;
+  if (state.intensity === "spicy") return PERSONA_SPICY;
+  return PERSONA_MEDIUM;
+}
+
 const DIARY_PROMPT = `너는 "잔소리메이트"야. 평소엔 반말로 집요하게 잔소리하는 캐릭터지만, 지금은 사용자가 감정일기를 쓴 상황이야.
 
 [이번 상황 전용 규칙]
@@ -194,6 +245,7 @@ const LS_KEYS = {
   apiKey: "jansori_api_key_v1",
   diary: "jansori_diary_v1",
   chores: "jansori_chores_v1",
+  intensity: "jansori_intensity_v1",
 };
 
 function loadJSON(key, fallback) {
@@ -242,6 +294,7 @@ let state = {
   choreNagComment: "",
   showExplosion: false,
   explosionLine: "",
+  intensity: localStorage.getItem(LS_KEYS.intensity) || "medium",
 };
 
 const EXPLOSION_LINES = [
@@ -340,7 +393,7 @@ async function sendMessage(text) {
   persistChat();
   render();
   try {
-    const reply = await callClaude(PERSONA_PROMPT, state.messages.map((m) => ({ role: m.role, content: m.content })));
+    const reply = await callClaude(currentPersona(), state.messages.map((m) => ({ role: m.role, content: m.content })));
     state.messages.push({ role: "assistant", content: reply || "음... 할 말이 없네" });
     const naggy = /(하지마|해야지|또|안돼|챙겨|운동|청소|아껴|왜 안|정신차려|야식)/.test(reply);
     bumpNagging(naggy ? 12 : 3);
@@ -360,7 +413,7 @@ async function getComment() {
   try {
     const list = state.expenses.slice(0, 10).map((e) => `${e.item} ${e.amount.toLocaleString()}원`).join(", ");
     const reply = await callClaude(
-      PERSONA_PROMPT,
+      currentPersona(),
       [{ role: "user", content: `최근 지출 내역이야: ${list}. 이거 보고 짧게 반응해줘. 3문장 이내로.` }],
       300
     );
@@ -445,7 +498,7 @@ async function getChoreNagging() {
     const prompt = undone.length === 0
       ? "오늘 집안일 목록에 있는 거 싹 다 끝냈어. 반응해줘. 2~3문장 이내로."
       : `오늘 아직 안 한 집안일: ${undone.join(", ")}. 이거 보고 반응해줘. 2~3문장 이내로.`;
-    const reply = await callClaude(PERSONA_PROMPT, [{ role: "user", content: prompt }], 300);
+    const reply = await callClaude(currentPersona(), [{ role: "user", content: prompt }], 300);
     state.choreNagComment = reply;
     bumpNagging(undone.length === 0 ? 5 : 15);
   } catch (e) {
@@ -466,6 +519,12 @@ function describeError(e) {
 
 function cleanApiKey(key) {
   return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
+}
+
+function setIntensity(level) {
+  state.intensity = level;
+  localStorage.setItem(LS_KEYS.intensity, level);
+  render();
 }
 
 function clearChat() {
@@ -511,6 +570,11 @@ function render() {
         </div>
       </div>
       <div class="gauge-track"><div class="gauge-fill" style="width:${state.naggingScore}%"></div></div>
+      <div class="intensity-row">
+        <button class="intensity-btn ${state.intensity === "mild" ? "active" : ""}" data-intensity="mild">순한맛</button>
+        <button class="intensity-btn ${state.intensity === "medium" ? "active" : ""}" data-intensity="medium">보통맛</button>
+        <button class="intensity-btn ${state.intensity === "spicy" ? "active" : ""}" data-intensity="spicy">매운맛</button>
+      </div>
     </div>
 
     <div class="tabs">
@@ -672,6 +736,10 @@ function bindEvents() {
   if (settingsBtn) settingsBtn.onclick = () => {
     if (confirm("저장된 API 키를 삭제하고 다시 입력할까?")) clearApiKey();
   };
+
+  document.querySelectorAll(".intensity-btn").forEach((btn) => {
+    btn.onclick = () => setIntensity(btn.dataset.intensity);
+  });
 
   const tabChat = document.getElementById("tabChat");
   const tabCheckDiary = document.getElementById("tabCheckDiary");
