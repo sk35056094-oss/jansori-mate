@@ -107,6 +107,43 @@
   .chore-nag-btn:disabled { opacity: 0.5; }
   .section-title { font-family: 'Gaegu', cursive; font-size: 18px; color: #F4A340; margin-bottom: 10px; }
   .section-divider { height: 1px; background: #2A2938; margin: 24px 0; }
+
+  .explosion-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(255,93,93,0.12);
+    animation: explosionFlash 0.35s ease-in-out 4;
+    pointer-events: none;
+  }
+  .explosion-emoji { font-size: 110px; animation: explosionPop 0.5s ease-out; }
+  .explosion-text {
+    margin-top: 18px; max-width: 80%; text-align: center;
+    font-family: 'Gaegu', cursive; font-size: 28px; font-weight: 700;
+    color: #FF5D5D; text-shadow: 0 0 12px rgba(255,93,93,0.7);
+    animation: explosionShakeText 0.4s ease-in-out infinite;
+  }
+  @keyframes explosionFlash {
+    0%, 100% { background: rgba(255,93,93,0.05); }
+    50% { background: rgba(255,93,93,0.3); }
+  }
+  @keyframes explosionPop {
+    0% { transform: scale(0.2) rotate(-15deg); opacity: 0; }
+    60% { transform: scale(1.35) rotate(8deg); opacity: 1; }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+  @keyframes explosionShakeText {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px) rotate(-1deg); }
+    75% { transform: translateX(5px) rotate(1deg); }
+  }
+  #app.shaking { animation: appShake 0.4s ease-in-out 4; }
+  @keyframes appShake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-10px); }
+    40% { transform: translateX(9px); }
+    60% { transform: translateX(-7px); }
+    80% { transform: translateX(7px); }
+  }
 </style>
 </head>
 <body>
@@ -202,8 +239,39 @@ let state = {
   choreInput: "",
   choreNagLoading: false,
   choreNagComment: "",
+  showExplosion: false,
+  explosionLine: "",
 };
 
+const EXPLOSION_LINES = [
+  "으아아악!!! 더는 못 참아!!!",
+  "잔소리 게이지 초과!!! 폭발한다!!!",
+  "야!!! 진짜!!! 정신 안 차릴 거야?!",
+  "으아 몰라 몰라!!! 폭발이다!!!",
+];
+
+function bumpNagging(amount) {
+  const prev = state.naggingScore;
+  state.naggingScore = Math.min(100, prev + amount);
+  if (state.naggingScore >= 100 && prev < 100) {
+    triggerExplosion();
+  }
+}
+
+function triggerExplosion() {
+  state.showExplosion = true;
+  state.explosionLine = EXPLOSION_LINES[Math.floor(Math.random() * EXPLOSION_LINES.length)];
+  render();
+  const appEl = document.getElementById("app");
+  if (appEl) appEl.classList.add("shaking");
+  setTimeout(() => {
+    if (appEl) appEl.classList.remove("shaking");
+    state.showExplosion = false;
+    state.naggingScore = 15;
+    persistChat();
+    render();
+  }, 2200);
+}
 function persistChat() { saveJSON(LS_KEYS.chat, { messages: state.messages, naggingScore: state.naggingScore }); }
 function persistLedger() { saveJSON(LS_KEYS.ledger, { expenses: state.expenses }); }
 function persistDiary() { saveJSON(LS_KEYS.diary, state.diaryEntries); }
@@ -274,7 +342,7 @@ async function sendMessage(text) {
     const reply = await callClaude(PERSONA_PROMPT, state.messages.map((m) => ({ role: m.role, content: m.content })));
     state.messages.push({ role: "assistant", content: reply || "음... 할 말이 없네" });
     const naggy = /(하지마|해야지|또|안돼|챙겨|운동|청소|아껴|왜 안|정신차려|야식)/.test(reply);
-    state.naggingScore = Math.min(100, state.naggingScore + (naggy ? 12 : 3));
+    bumpNagging(naggy ? 12 : 3);
   } catch (e) {
     state.messages.push({ role: "assistant", content: `어... 지금 연결이 좀 이상한데? (디버그: ${describeError(e)})` });
   } finally {
@@ -296,7 +364,7 @@ async function getComment() {
       300
     );
     state.comment = reply;
-    state.naggingScore = Math.min(100, state.naggingScore + 15);
+    bumpNagging(15);
   } catch (e) {
     state.comment = `코멘트를 못 가져왔어. (디버그: ${describeError(e)})`;
   } finally {
@@ -378,7 +446,7 @@ async function getChoreNagging() {
       : `오늘 아직 안 한 집안일: ${undone.join(", ")}. 이거 보고 반응해줘. 2~3문장 이내로.`;
     const reply = await callClaude(PERSONA_PROMPT, [{ role: "user", content: prompt }], 300);
     state.choreNagComment = reply;
-    state.naggingScore = Math.min(100, state.naggingScore + (undone.length === 0 ? 5 : 15));
+    bumpNagging(undone.length === 0 ? 5 : 15);
   } catch (e) {
     state.choreNagComment = `반응을 못 가져왔어. (디버그: ${describeError(e)})`;
   } finally {
@@ -450,6 +518,7 @@ function render() {
     }
 
     ${state.showKeyOverlay ? renderKeyOverlay() : ""}
+    ${state.showExplosion ? renderExplosion() : ""}
   `;
 
   bindEvents();
@@ -559,6 +628,15 @@ function renderCheckDiaryTab() {
         ${state.diaryLoading ? "반응 기다리는 중..." : "저장하고 반응 듣기"}
       </button>
       ${diaryEntries}
+    </div>
+  `;
+}
+
+function renderExplosion() {
+  return `
+    <div class="explosion-overlay">
+      <div class="explosion-emoji">💥</div>
+      <div class="explosion-text">${esc(state.explosionLine)}</div>
     </div>
   `;
 }
