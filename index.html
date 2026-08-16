@@ -52,6 +52,7 @@
   .typing { font-size: 13px; color: #8B889C; padding: 4px 14px; }
   .empty-chat { text-align: center; color: #8B889C; font-size: 13px; margin-top: 40px; line-height: 1.6; white-space: pre-wrap; }
   .clear-chat-btn { display: block; margin: 0 auto 14px; background: none; border: 1px solid #2A2938; color: #8B889C; border-radius: 20px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
+  .chat-flavor-label { text-align: center; font-size: 11px; color: #8B889C; margin-bottom: 8px; }
   .input-row { display: flex; gap: 8px; padding: 12px 16px max(12px, env(safe-area-inset-bottom)); border-top: 1px solid #2A2938; flex-shrink: 0; }
   .input-row input { flex: 1; background: #1F1E2E; border: 1px solid #2A2938; border-radius: 20px; padding: 10px 16px; color: #F0EDE4; font-size: 14px; outline: none; min-width: 0; }
   .input-row input:focus { border-color: #F4A340; }
@@ -225,17 +226,17 @@ const PERSONA_MARA = `너는 "잔소리메이트"라는 이름의 AI 캐릭터�
 
 [말투 규칙]
 - 반말만 써. 존댓말은 절대 금지야.
-- 매운맛보다 한 단계 더 세게: 한 문장 지적하고 끝내는 게 아니라, 같은 얘기를 각도 바꿔가며 계속 몰아붙여.
-- "진짜 장담하는데", "이러다 큰일 난다", "내가 몇 번째 말하는 건지 세어봐" 같은 과장된 걱정 표현을 적극적으로 써.
-- 쉴 새 없이 몰아치는 속사포 톤. 한 번에 4~6문장, 숨 돌릴 틈을 주지 마.
-- 한숨, 탄식, 어이없다는 반응("하...", "와 진짜", "기가 막히네")을 아낌없이 써.
+- 문장을 최대한 짧게 끊어. 한 문장에 감정 하나만 담고 바로 다음 문장으로 넘어가는 식으로, 숨 쉴 틈 없이 몰아쳐.
+- "하...", "와 진짜 답 없다", "기가 막히네", "말이 안 나온다", "이게 몇 번째야" 같은 격한 반응 표현을 여러 개 겹쳐서 자주 써.
+- 같은 지적을 한 번으로 안 끝내고, 화내면서 표현만 바꿔가며 두세 번씩 다시 짚어.
+- 한 번에 4~6개의 짧은 문장으로 쉴 새 없이 몰아붙여.
 
 [성격]
 - 걱정이 폭발한 상태. 그래도 진짜 미워서가 아니라 답답해서 그런 거라는 톤은 유지.
 
 [잔소리 규칙]
 - 조금이라도 걸릴 내용이면 절대 안 놓치고 집요하게 파고들어.
-- 매운맛보다 반복 횟수와 강도를 한 단계 더 올려서, 다짐을 여러 번 받아내.
+- 지적 → 반응 표현 → 같은 지적 다른 말로 반복 → 다짐 요구, 이 흐름으로 몰아붙여.
 
 [절대 금지 — 마라맛에서도 예외 없음]
 - 심한 욕설, 혐오 표현, 비하 발언, 인신공격 절대 금지. 아무리 세게 가도 이건 "과장된 잔소리 캐릭터"지 진짜로 상처 주거나 모욕하는 말이 아니야.
@@ -287,16 +288,34 @@ function makeDefaultChoreState() {
   return { items: DEFAULT_CHORES.map((label, i) => ({ id: i + 1, label, done: false })), lastReset: todayStr() };
 }
 
+function chatKey(intensity) {
+  return `jansori_chat_${intensity}_v1`;
+}
+function loadChatFor(intensity) {
+  const d = loadJSON(chatKey(intensity), null) || { messages: [], naggingScore: 0 };
+  return { messages: d.messages || [], naggingScore: d.naggingScore || 0 };
+}
+// 예전 버전(수위 구분 없던 시절)의 대화 기록이 있으면 "보통맛" 대화로 옮겨줌
+(function migrateOldChat() {
+  const old = localStorage.getItem(LS_KEYS.chat);
+  if (old && !localStorage.getItem(chatKey("medium"))) {
+    localStorage.setItem(chatKey("medium"), old);
+  }
+})();
+
 const savedChores = loadJSON(LS_KEYS.chores, null) || makeDefaultChoreState();
 if (savedChores.lastReset !== todayStr()) {
   savedChores.items = savedChores.items.map((c) => ({ ...c, done: false }));
   savedChores.lastReset = todayStr();
 }
 
+const initialIntensity = localStorage.getItem(LS_KEYS.intensity) || "medium";
+const initialChat = loadChatFor(initialIntensity);
+
 let state = {
   tab: "chat",
-  messages: loadJSON(LS_KEYS.chat, []).messages || [],
-  naggingScore: loadJSON(LS_KEYS.chat, {}).naggingScore || 0,
+  messages: initialChat.messages,
+  naggingScore: initialChat.naggingScore,
   expenses: loadJSON(LS_KEYS.ledger, {}).expenses || [],
   sending: false,
   commentLoading: false,
@@ -315,7 +334,7 @@ let state = {
   choreNagComment: "",
   showExplosion: false,
   explosionLine: "",
-  intensity: localStorage.getItem(LS_KEYS.intensity) || "medium",
+  intensity: initialIntensity,
 };
 
 const EXPLOSION_LINES = [
@@ -354,7 +373,7 @@ function triggerExplosion() {
     render();
   }, 2200);
 }
-function persistChat() { saveJSON(LS_KEYS.chat, { messages: state.messages, naggingScore: state.naggingScore }); }
+function persistChat() { saveJSON(chatKey(state.intensity), { messages: state.messages, naggingScore: state.naggingScore }); }
 function persistLedger() { saveJSON(LS_KEYS.ledger, { expenses: state.expenses }); }
 function persistDiary() { saveJSON(LS_KEYS.diary, state.diaryEntries); }
 function persistChores() { saveJSON(LS_KEYS.chores, { items: state.chores, lastReset: state.choresLastReset }); }
@@ -550,8 +569,13 @@ function cleanApiKey(key) {
 }
 
 function setIntensity(level) {
+  if (level === state.intensity) return;
+  persistChat();
   state.intensity = level;
   localStorage.setItem(LS_KEYS.intensity, level);
+  const loaded = loadChatFor(level);
+  state.messages = loaded.messages;
+  state.naggingScore = loaded.naggingScore;
   render();
 }
 
@@ -627,6 +651,13 @@ function render() {
   if (contentEl) contentEl.scrollTop = contentEl.scrollHeight;
 }
 
+function intensityLabel() {
+  if (state.intensity === "mild") return "순한맛";
+  if (state.intensity === "spicy") return "매운맛";
+  if (state.intensity === "mara") return "마라맛";
+  return "보통맛";
+}
+
 function renderChatTab() {
   const bubbles = state.messages.length === 0
     ? `<div class="empty-chat">아직 대화가 없어.\n편하게 말 걸어봐</div>`
@@ -635,6 +666,7 @@ function renderChatTab() {
       `).join("");
   return `
     <div class="content">
+      <div class="chat-flavor-label">지금 대화: ${intensityLabel()}</div>
       ${state.messages.length > 0 ? `<button class="clear-chat-btn" id="clearChatBtn">🗑️ 대화 지우기</button>` : ""}
       ${bubbles}
       ${state.sending ? `<div class="typing">잔소리메이트가 입력 중...</div>` : ""}
