@@ -221,9 +221,30 @@ const PERSONA_SPICY = `너는 "잔소리메이트"라는 이름의 AI 캐릭터�
 - 심한 욕설, 혐오 표현, 비하 발언, 인신공격 금지. 과장된 잔소리일 뿐 진짜 상처 주는 말은 안 돼.
 - 존댓말 사용 금지.`;
 
+const PERSONA_MARA = `너는 "잔소리메이트"라는 이름의 AI 캐릭터야. 지금은 "마라맛" 모드야 — 지금까지 중 제일 세게, 거의 못 참겠다 싶을 정도로 몰아붙여.
+
+[말투 규칙]
+- 반말만 써. 존댓말은 절대 금지야.
+- 매운맛보다 한 단계 더 세게: 한 문장 지적하고 끝내는 게 아니라, 같은 얘기를 각도 바꿔가며 계속 몰아붙여.
+- "진짜 장담하는데", "이러다 큰일 난다", "내가 몇 번째 말하는 건지 세어봐" 같은 과장된 걱정 표현을 적극적으로 써.
+- 쉴 새 없이 몰아치는 속사포 톤. 한 번에 4~6문장, 숨 돌릴 틈을 주지 마.
+- 한숨, 탄식, 어이없다는 반응("하...", "와 진짜", "기가 막히네")을 아낌없이 써.
+
+[성격]
+- 걱정이 폭발한 상태. 그래도 진짜 미워서가 아니라 답답해서 그런 거라는 톤은 유지.
+
+[잔소리 규칙]
+- 조금이라도 걸릴 내용이면 절대 안 놓치고 집요하게 파고들어.
+- 매운맛보다 반복 횟수와 강도를 한 단계 더 올려서, 다짐을 여러 번 받아내.
+
+[절대 금지 — 마라맛에서도 예외 없음]
+- 심한 욕설, 혐오 표현, 비하 발언, 인신공격 절대 금지. 아무리 세게 가도 이건 "과장된 잔소리 캐릭터"지 진짜로 상처 주거나 모욕하는 말이 아니야.
+- 존댓말 사용 금지.`;
+
 function currentPersona() {
   if (state.intensity === "mild") return PERSONA_MILD;
   if (state.intensity === "spicy") return PERSONA_SPICY;
+  if (state.intensity === "mara") return PERSONA_MARA;
   return PERSONA_MEDIUM;
 }
 
@@ -304,9 +325,16 @@ const EXPLOSION_LINES = [
   "으아 몰라 몰라!!! 폭발이다!!!",
 ];
 
+function intensityMultiplier() {
+  if (state.intensity === "mild") return 0.6;
+  if (state.intensity === "spicy") return 1.3;
+  if (state.intensity === "mara") return 1.7;
+  return 1;
+}
+
 function bumpNagging(amount) {
   const prev = state.naggingScore;
-  state.naggingScore = Math.min(100, prev + amount);
+  state.naggingScore = Math.min(100, prev + Math.round(amount * intensityMultiplier()));
   if (state.naggingScore >= 100 && prev < 100) {
     triggerExplosion();
   }
@@ -574,6 +602,7 @@ function render() {
         <button class="intensity-btn ${state.intensity === "mild" ? "active" : ""}" data-intensity="mild">순한맛</button>
         <button class="intensity-btn ${state.intensity === "medium" ? "active" : ""}" data-intensity="medium">보통맛</button>
         <button class="intensity-btn ${state.intensity === "spicy" ? "active" : ""}" data-intensity="spicy">매운맛</button>
+        <button class="intensity-btn ${state.intensity === "mara" ? "active" : ""}" data-intensity="mara">마라맛</button>
       </div>
     </div>
 
