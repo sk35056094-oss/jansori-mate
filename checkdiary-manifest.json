@@ -1,0 +1,15 @@
+{
+  "name": "체크&일기",
+  "short_name": "체크&일기",
+  "description": "집안일 체크리스트 + 감정일기",
+  "start_url": "./checkdiary.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#14131F",
+  "theme_color": "#14131F",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "checkdiary-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "checkdiary-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

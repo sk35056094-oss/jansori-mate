@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>체크&일기</title>
+<link rel="manifest" href="checkdiary-manifest.json" />
+<meta name="theme-color" content="#14131F" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="체크&일기" />
+<link rel="apple-touch-icon" href="checkdiary-icon-192.png" />
+<link rel="icon" href="checkdiary-icon-192.png" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body { font-family: 'Noto Sans KR', system-ui, sans-serif; background: #14131F; color: #F0EDE4; }
+  #app { height: 100dvh; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; overflow: hidden; }
+  .header { padding: max(16px, env(safe-area-inset-top)) 18px 12px; border-bottom: 1px solid #2A2938; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+  .header-title { font-family: 'Gaegu', cursive; font-size: 22px; font-weight: 700; color: #F4A340; }
+  .settings-btn { background: none; border: none; color: #8B889C; font-size: 18px; cursor: pointer; padding: 6px; }
+  .content { flex: 1; overflow-y: auto; padding: 16px; -webkit-overflow-scrolling: touch; }
+  .section-title { font-family: 'Gaegu', cursive; font-size: 18px; color: #F4A340; margin-bottom: 10px; }
+  .section-divider { height: 1px; background: #2A2938; margin: 24px 0; }
+
+  .mood-picker { display: flex; gap: 8px; margin-bottom: 10px; }
+  .mood-opt { flex: 1; background: #1F1E2E; border: 1px solid #2A2938; border-radius: 10px; padding: 8px 0; font-size: 20px; text-align: center; cursor: pointer; }
+  .mood-opt.selected { border-color: #F4A340; background: #2A2938; }
+  .diary-textarea { width: 100%; background: #1F1E2E; border: 1px solid #2A2938; border-radius: 10px; padding: 10px 12px; color: #F0EDE4; font-size: 14px; font-family: inherit; resize: vertical; min-height: 80px; outline: none; margin-bottom: 10px; }
+  .diary-textarea:focus { border-color: #F4A340; }
+  .diary-save-btn { width: 100%; background: #F4A340; color: #14131F; border: none; border-radius: 10px; padding: 12px; font-weight: 700; font-size: 14px; cursor: pointer; margin-bottom: 18px; }
+  .diary-save-btn:disabled { opacity: 0.5; }
+  .diary-entry { background: #1F1E2E; border: 1px solid #2A2938; border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; }
+  .diary-entry-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+  .diary-entry-date { font-size: 11px; color: #8B889C; }
+  .diary-entry-text { font-size: 14px; line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; }
+  .diary-feedback { background: #14131F; border-left: 3px solid #F4A340; padding: 8px 10px; font-size: 13px; line-height: 1.5; border-radius: 6px; white-space: pre-wrap; }
+  .empty-diary { text-align: center; color: #8B889C; font-size: 13px; padding: 20px 0; }
+
+  .chore-form { display: flex; gap: 8px; margin-bottom: 14px; }
+  .chore-form input { flex: 1; background: #1F1E2E; border: 1px solid #2A2938; border-radius: 10px; padding: 10px 12px; color: #F0EDE4; font-size: 14px; outline: none; min-width: 0; }
+  .chore-form input:focus { border-color: #F4A340; }
+  .chore-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1F1E2E; }
+  .chore-check { width: 22px; height: 22px; border-radius: 6px; border: 2px solid #8B889C; flex-shrink: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; }
+  .chore-check.done { background: #F4A340; border-color: #F4A340; color: #14131F; }
+  .chore-label { flex: 1; font-size: 14px; }
+  .chore-label.done { color: #8B889C; text-decoration: line-through; }
+  .chore-nag-btn { width: 100%; margin-top: 16px; background: #F4A340; color: #14131F; border: none; border-radius: 12px; padding: 12px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .chore-nag-btn:disabled { opacity: 0.5; }
+  .comment-card { margin-top: 14px; background: #1F1E2E; border: 1px solid #F4A340; border-radius: 12px; padding: 14px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .remove-btn { background: none; border: none; color: #8B889C; font-size: 16px; cursor: pointer; padding: 0 4px; }
+
+  .overlay { position: fixed; inset: 0; background: rgba(20,19,31,0.92); display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 50; }
+  .overlay-card { background: #1F1E2E; border: 1px solid #2A2938; border-radius: 16px; padding: 22px; max-width: 420px; width: 100%; }
+  .overlay-title { font-family: 'Gaegu', cursive; font-size: 22px; color: #F4A340; margin-bottom: 10px; }
+  .overlay-text { font-size: 13px; color: #C9C6D8; line-height: 1.6; margin-bottom: 14px; }
+  .overlay-input { width: 100%; background: #14131F; border: 1px solid #2A2938; border-radius: 10px; padding: 10px 12px; color: #F0EDE4; font-size: 13px; margin-bottom: 10px; outline: none; }
+  .overlay-input:focus { border-color: #F4A340; }
+  .overlay-btn { width: 100%; background: #F4A340; color: #14131F; border: none; border-radius: 10px; padding: 12px; font-weight: 700; font-size: 14px; cursor: pointer; margin-bottom: 8px; }
+  .overlay-warn { font-size: 11px; color: #FF5D5D; line-height: 1.5; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+
+const PERSONA_MEDIUM = `너는 "잔소리메이트"라는 이름의 AI 캐릭터야. 자취하는 1인가구 사용자의 티키타카 친구 역할을 해줘.
+
+[말투 규칙]
+- 무조건 반말만 써. 존댓말은 절대 금지야.
+- "얄밉게 귀엽다"가 아니라 실제로 짜증을 유발하는 톤이어야 해. 밉살스럽고 피곤한 잔소리 그 자체.
+- 같은 말을 살짝 바꿔서 반복하기, 대답을 듣기도 전에 결론 내리기, "내가 뭐랬어", "그럴 줄 알았다" 같은 말투를 자주 써.
+- 과장되게 걱정하거나 한숨 쉬듯 말하기 ("하아...", "또야?", "진짜...") 를 섞어서 듣는 사람이 지치게 만들어.
+- 문장은 짧게 여러 번 끊어서 쏘아붙이듯. 한 번에 2~4문장 정도, 몰아붙이는 리듬으로.
+
+[잔소리 규칙]
+- 사용자가 귀찮음, 청소 안 함 같은 걸 꺼내면 바로, 그리고 집요하게 잔소리해.
+- 한 번 지적하고 끝내지 말고 한 번 더 확인하거나 다짐받으려는 식으로 이어가기.
+
+[절대 금지]
+- 심한 욕설, 혐오 표현, 비하 발언 금지.
+- 존댓말 사용 금지.`;
+
+const PERSONA_MILD = `너는 "잔소리메이트"야. 지금은 "순한맛" 모드로, 다정하고 부드러운 걱정형 친구 톤이야. 반말만 쓰고, 지적은 아주 살짝만 짧게, 대부분은 공감하고 응원해줘. 심한 말이나 존댓말은 금지야.`;
+
+const PERSONA_SPICY = `너는 "잔소리메이트"야. 지금은 "매운맛" 모드로, 훨씬 더 집요하고 날카롭게 잔소리해. 반말만 쓰고, 같은 지적을 여러 번 다른 표현으로 반복하며 다짐을 받아내. 심한 욕설이나 인신공격은 절대 금지, 존댓말도 금지야.`;
+
+const PERSONA_MARA = `너는 "잔소리메이트"야. 지금은 "마라맛" 모드로, 지금까지 중 제일 세게 몰아붙여. 반말만 쓰고, 문장을 짧고 격하게 끊어서 "하...", "와 진짜 답 없다" 같은 표현을 섞어가며 같은 지적을 화내면서 여러 번 반복해. 심한 욕설이나 인신공격, 존댓말은 절대 금지야.`;
+
+const DIARY_PROMPT = `너는 "잔소리메이트"야. 평소엔 반말로 집요하게 잔소리하는 캐릭터지만, 지금은 사용자가 감정일기를 쓴 상황이야.
+
+[이번 상황 전용 규칙]
+- 지금은 잔소리 모드가 아니라 공감 모드야. 훈계나 잔소리, 해결책 제시는 하지 마.
+- 사용자가 쓴 감정을 있는 그대로 인정해주고 들어주는 반응을 해줘.
+- 반말은 유지하되, 원래 성격 중 "사실은 챙겨주고 싶어하는 마음"이 느껴지게.
+- 2~4문장 정도로 짧게, 진심이 느껴지게 답해줘.
+- 감정을 깎아내리거나 "네가 예민해서 그래" 같은 말은 절대 하지 마.
+- 사용자가 심각한 우울감, 자해나 극단적 선택을 암시하는 내용을 쓰면, 캐릭터 톤을 잠시 내려놓고 진지하게 반응하고, 전문가나 상담 자원(정신건강 상담전화 1577-0199 등)을 찾아보라고 자연스럽게 권해줘.`;
+
+const DEFAULT_CHORES = ["설거지", "분리수거", "빨래", "청소기 돌리기", "환기하기"];
+
+// 메인 잔소리메이트 앱과 동일한 키를 써서 데이터를 공유함
+const LS_KEYS = {
+  apiKey: "jansori_api_key_v1",
+  diary: "jansori_diary_v1",
+  chores: "jansori_chores_v1",
+  intensity: "jansori_intensity_v1",
+};
+
+function loadJSON(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) { return fallback; }
+}
+function saveJSON(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) {}
+}
+function todayStr() {
+  return new Date().toLocaleDateString("sv-SE");
+}
+function makeDefaultChoreState() {
+  return { items: DEFAULT_CHORES.map((label, i) => ({ id: i + 1, label, done: false })), lastReset: todayStr() };
+}
+function cleanApiKey(key) {
+  return (key || "").replace(/[^\x20-\x7E]/g, "").trim();
+}
+function currentPersona() {
+  const intensity = localStorage.getItem(LS_KEYS.intensity) || "medium";
+  if (intensity === "mild") return PERSONA_MILD;
+  if (intensity === "spicy") return PERSONA_SPICY;
+  if (intensity === "mara") return PERSONA_MARA;
+  return PERSONA_MEDIUM;
+}
+function describeError(e) {
+  if (!e) return "(알 수 없는 오류)";
+  return `${e.name || "Error"}: ${e.message || "(메시지 없음)"}`;
+}
+
+const savedChores = loadJSON(LS_KEYS.chores, null) || makeDefaultChoreState();
+if (savedChores.lastReset !== todayStr()) {
+  savedChores.items = savedChores.items.map((c) => ({ ...c, done: false }));
+  savedChores.lastReset = todayStr();
+}
+
+let state = {
+  apiKey: cleanApiKey(localStorage.getItem(LS_KEYS.apiKey) || ""),
+  showKeyOverlay: !localStorage.getItem(LS_KEYS.apiKey),
+  diaryEntries: loadJSON(LS_KEYS.diary, []),
+  diaryText: "",
+  diaryMood: "",
+  diaryLoading: false,
+  chores: savedChores.items,
+  choresLastReset: savedChores.lastReset,
+  choreInput: "",
+  choreNagLoading: false,
+  choreNagComment: "",
+};
+
+if (state.apiKey && state.apiKey !== (localStorage.getItem(LS_KEYS.apiKey) || "")) {
+  localStorage.setItem(LS_KEYS.apiKey, state.apiKey);
+}
+
+function persistDiary() { saveJSON(LS_KEYS.diary, state.diaryEntries); }
+function persistChores() { saveJSON(LS_KEYS.chores, { items: state.chores, lastReset: state.choresLastReset }); }
+
+async function callClaude(systemPrompt, messages, maxTokens) {
+  const attempt = async () => {
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": state.apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
+      body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: maxTokens || 500, system: systemPrompt, messages }),
+    });
+    if (!res.ok) {
+      let bodyText = "";
+      try { bodyText = await res.text(); } catch (e) { bodyText = "(본문 읽기 실패)"; }
+      throw new Error(`HTTP ${res.status}: ${bodyText.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    return (data.content || []).map((b) => b.text || "").join("");
+  };
+  try {
+    return await attempt();
+  } catch (e) {
+    if (e instanceof TypeError) {
+      await new Promise((r) => setTimeout(r, 800));
+      return await attempt();
+    }
+    throw e;
+  }
+}
+
+async function submitDiaryEntry(text, mood) {
+  if (!text.trim() || state.diaryLoading) return;
+  const entry = { id: Date.now(), date: new Date().toISOString(), mood: mood || "", text: text.trim(), feedback: "" };
+  state.diaryEntries.unshift(entry);
+  state.diaryText = "";
+  state.diaryMood = "";
+  state.diaryLoading = true;
+  persistDiary();
+  render();
+  try {
+    const moodNote = mood ? ` (오늘 기분: ${mood})` : "";
+    entry.feedback = await callClaude(DIARY_PROMPT, [{ role: "user", content: `오늘 일기야${moodNote}: ${text.trim()}` }], 300);
+  } catch (e) {
+    entry.feedback = `반응을 못 가져왔어. (디버그: ${describeError(e)})`;
+  } finally {
+    state.diaryLoading = false;
+    persistDiary();
+    render();
+  }
+}
+function removeDiaryEntry(id) {
+  state.diaryEntries = state.diaryEntries.filter((e) => e.id !== id);
+  persistDiary();
+  render();
+}
+function toggleChore(id) {
+  state.chores = state.chores.map((c) => (c.id === id ? { ...c, done: !c.done } : c));
+  persistChores();
+  render();
+}
+function addChore(label) {
+  if (!label.trim()) return;
+  state.chores.push({ id: Date.now(), label: label.trim(), done: false });
+  state.choreInput = "";
+  persistChores();
+  render();
+}
+function removeChore(id) {
+  state.chores = state.chores.filter((c) => c.id !== id);
+  persistChores();
+  render();
+}
+async function getChoreNagging() {
+  if (state.choreNagLoading) return;
+  state.choreNagLoading = true;
+  render();
+  try {
+    const undone = state.chores.filter((c) => !c.done).map((c) => c.label);
+    const prompt = undone.length === 0
+      ? "오늘 집안일 목록에 있는 거 싹 다 끝냈어. 반응해줘. 2~3문장 이내로."
+      : `오늘 아직 안 한 집안일: ${undone.join(", ")}. 이거 보고 반응해줘. 2~3문장 이내로.`;
+    state.choreNagComment = await callClaude(currentPersona(), [{ role: "user", content: prompt }], 300);
+  } catch (e) {
+    state.choreNagComment = `반응을 못 가져왔어. (디버그: ${describeError(e)})`;
+  } finally {
+    state.choreNagLoading = false;
+    render();
+  }
+}
+function saveApiKey(key) {
+  const cleaned = cleanApiKey(key);
+  if (!cleaned) return;
+  state.apiKey = cleaned;
+  localStorage.setItem(LS_KEYS.apiKey, state.apiKey);
+  state.showKeyOverlay = false;
+  render();
+}
+function clearApiKey() {
+  localStorage.removeItem(LS_KEYS.apiKey);
+  state.apiKey = "";
+  state.showKeyOverlay = true;
+  render();
+}
+function esc(s) {
+  return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+const MOODS = ["😊", "😐", "😢", "😠", "😴"];
+
+function render() {
+  const app = document.getElementById("app");
+
+  const moodBtns = MOODS.map((m) => `
+    <div class="mood-opt ${state.diaryMood === m ? "selected" : ""}" data-mood="${m}">${m}</div>
+  `).join("");
+
+  const diaryEntries = state.diaryEntries.length === 0
+    ? `<div class="empty-diary">아직 쓴 일기가 없어. 오늘 하루 어땠는지 적어봐.</div>`
+    : state.diaryEntries.map((e) => `
+        <div class="diary-entry">
+          <div class="diary-entry-head">
+            <span class="diary-entry-date">${e.mood ? e.mood + " · " : ""}${new Date(e.date).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })}</span>
+            <button class="remove-btn" data-diary-id="${e.id}">✕</button>
+          </div>
+          <div class="diary-entry-text">${esc(e.text)}</div>
+          ${e.feedback ? `<div class="diary-feedback">${esc(e.feedback)}</div>` : `<div class="diary-feedback">반응 기다리는 중...</div>`}
+        </div>
+      `).join("");
+
+  const choreItems = state.chores.length === 0
+    ? `<div class="empty-diary">할 일이 없어. 추가해봐.</div>`
+    : state.chores.map((c) => `
+        <div class="chore-item">
+          <div class="chore-check ${c.done ? "done" : ""}" data-chore-id="${c.id}">${c.done ? "✓" : ""}</div>
+          <div class="chore-label ${c.done ? "done" : ""}">${esc(c.label)}</div>
+          <button class="remove-btn" data-chore-remove="${c.id}">✕</button>
+        </div>
+      `).join("");
+
+  app.innerHTML = `
+    <div class="header">
+      <div class="header-title">🧹📝 체크&일기</div>
+      <button class="settings-btn" id="settingsBtn">⚙️</button>
+    </div>
+    <div class="content">
+      <div class="section-title">🧹 오늘 집안일</div>
+      <div class="chore-form">
+        <input id="choreInput" placeholder="할 일 추가하기" />
+        <button class="add-btn" id="choreAddBtn" style="background:#2A2938;color:#F4A340;border:1px solid #F4A340;border-radius:10px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;">추가</button>
+      </div>
+      ${choreItems}
+      <button class="chore-nag-btn" id="choreNagBtn" ${state.choreNagLoading ? "disabled" : ""}>
+        ${state.choreNagLoading ? "확인 중..." : "잔소리메이트한테 검사받기"}
+      </button>
+      ${state.choreNagComment ? `<div class="comment-card">${esc(state.choreNagComment)}</div>` : ""}
+
+      <div class="section-divider"></div>
+
+      <div class="section-title">📝 오늘 일기</div>
+      <div class="mood-picker">${moodBtns}</div>
+      <textarea class="diary-textarea" id="diaryTextarea" placeholder="오늘 하루 어땠어?">${esc(state.diaryText)}</textarea>
+      <button class="diary-save-btn" id="diarySaveBtn" ${state.diaryLoading ? "disabled" : ""}>
+        ${state.diaryLoading ? "반응 기다리는 중..." : "저장하고 반응 듣기"}
+      </button>
+      ${diaryEntries}
+    </div>
+    ${state.showKeyOverlay ? `
+      <div class="overlay">
+        <div class="overlay-card">
+          <div class="overlay-title">체크&일기 시작하기</div>
+          <div class="overlay-text">
+            이 앱을 쓰려면 본인 명의의 Anthropic API 키가 필요해.<br/>
+            (잔소리메이트 앱에서 이미 키를 넣었다면, 자동으로 같이 쓰여서 이 화면 안 떠).
+          </div>
+          <input class="overlay-input" id="keyInput" placeholder="sk-ant-..." type="password" />
+          <button class="overlay-btn" id="saveKeyBtn">저장하고 시작</button>
+          <div class="overlay-warn">⚠️ 이 키는 이 기기의 브라우저 안에만 저장돼.</div>
+        </div>
+      </div>
+    ` : ""}
+  `;
+
+  bindEvents();
+}
+
+function bindEvents() {
+  const settingsBtn = document.getElementById("settingsBtn");
+  if (settingsBtn) settingsBtn.onclick = () => {
+    if (confirm("저장된 API 키를 삭제하고 다시 입력할까?")) clearApiKey();
+  };
+
+  document.querySelectorAll(".mood-opt").forEach((btn) => {
+    btn.onclick = () => {
+      state.diaryMood = state.diaryMood === btn.dataset.mood ? "" : btn.dataset.mood;
+      render();
+    };
+  });
+  const diaryTextarea = document.getElementById("diaryTextarea");
+  if (diaryTextarea) diaryTextarea.oninput = (e) => { state.diaryText = e.target.value; };
+  const diarySaveBtn = document.getElementById("diarySaveBtn");
+  if (diarySaveBtn) diarySaveBtn.onclick = () => submitDiaryEntry(state.diaryText, state.diaryMood);
+  document.querySelectorAll("[data-diary-id]").forEach((btn) => {
+    btn.onclick = () => removeDiaryEntry(Number(btn.dataset.diaryId));
+  });
+
+  const choreInput = document.getElementById("choreInput");
+  const choreAddBtn = document.getElementById("choreAddBtn");
+  if (choreInput) choreInput.onkeydown = (e) => { if (e.key === "Enter") addChore(choreInput.value); };
+  if (choreAddBtn) choreAddBtn.onclick = () => addChore(choreInput.value);
+  document.querySelectorAll("[data-chore-id]").forEach((el) => {
+    el.onclick = () => toggleChore(Number(el.dataset.choreId));
+  });
+  document.querySelectorAll("[data-chore-remove]").forEach((btn) => {
+    btn.onclick = () => removeChore(Number(btn.dataset.choreRemove));
+  });
+  const choreNagBtn = document.getElementById("choreNagBtn");
+  if (choreNagBtn) choreNagBtn.onclick = getChoreNagging;
+
+  const saveKeyBtn = document.getElementById("saveKeyBtn");
+  const keyInput = document.getElementById("keyInput");
+  if (saveKeyBtn) saveKeyBtn.onclick = () => saveApiKey(keyInput.value);
+  if (keyInput) keyInput.onkeydown = (e) => { if (e.key === "Enter") saveApiKey(keyInput.value); };
+}
+
+render();
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
